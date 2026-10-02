@@ -81,6 +81,9 @@ user-hints = [
   "dep:tokio",
 ]
 inputcpy = []
+# Defines a `#[panic_handler]` that calls `abort`, for guests built without the standard
+# library. Not for `ziskos-staticlib`, which defines its own.
+panic-handler = []
 # Enabled by `ziskos-staticlib` (libziskos.a). Signals that ziskos is being
 # compiled into a static archive linked against a host application (C or Rust).
 # Surfaced as the `zisk_staticlib` cfg by build.rs.

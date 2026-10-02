@@ -374,35 +374,12 @@ pub mod ziskos {
           "la sp, _init_stack_top",
 
           // Call into Rust. `_zisk_main` returns `main`'s exit code in a0,
-          // which both exit paths below forward to the termination mechanism.
+          // which `terminate` forwards to the termination mechanism.
           "call {_zisk_main}",
-          "csrr t0, marchid",
-          //"li   t1, {_ARCH_ID_ZISK}",
-          "li   t1, 0xFFFEEEE",
-          "beq t0, t1, 1f",
-
-          // QEMU exit via the sifive_test device @ 0x100000. Encode the exit
-          // code (a0): 0 => 0x5555 (pass); otherwise (code << 16) | 0x3333.
-          "li t0, 0x100000",
-          "beqz a0, 3f",
-          "slli t1, a0, 16",
-          "li   t2, 0x3333",
-          "or   t1, t1, t2",
-          "sw t1, 0(t0)",
-          "j 2f",
-          "3:",
-          "li t1, 0x5555",
-          "sw t1, 0(t0)",
-          "j 2f",
-
-          // Zisk exit: syscall 93 (exit) takes the exit code in a0, already set
-          // by `_zisk_main`'s return value.
-          "1: li   a7, 93",
-          "ecall",
-
-          "2: j 2b",
+          "j {terminate}",
 
           _zisk_main = sym _zisk_main, // {entry} refers to the function [entry] below
+          terminate = sym terminate,
           options(noreturn) // we must handle "returning" from assembly
         );
 
@@ -415,6 +392,55 @@ pub mod ziskos {
         }
 
         getrandom::register_custom_getrandom!(zkvm_getrandom);
+    }
+
+    /// Ends the program with exit code `code`: 0 is a successful execution, any other value a
+    /// failed one.
+    extern "C" fn terminate(code: i32) -> ! {
+        unsafe {
+            asm!(
+              "csrr t0, marchid",
+              //"li   t1, {_ARCH_ID_ZISK}",
+              "li   t1, 0xFFFEEEE",
+              "beq t0, t1, 1f",
+
+              // QEMU exit via the sifive_test device @ 0x100000. Encode the exit
+              // code (a0): 0 => 0x5555 (pass); otherwise (code << 16) | 0x3333.
+              "li t0, 0x100000",
+              "beqz a0, 3f",
+              "slli t1, a0, 16",
+              "li   t2, 0x3333",
+              "or   t1, t1, t2",
+              "sw t1, 0(t0)",
+              "j 2f",
+              "3:",
+              "li t1, 0x5555",
+              "sw t1, 0(t0)",
+              "j 2f",
+
+              // Zisk exit: syscall 93 (exit) takes the exit code in a0.
+              "1: li   a7, 93",
+              "ecall",
+
+              "2: j 2b",
+              in("a0") code,
+              options(noreturn)
+            );
+        }
+    }
+
+    /// Ends the program as a failed execution, as the zkvm-standards termination semantics
+    /// define.
+    #[no_mangle]
+    pub extern "C" fn abort() -> ! {
+        terminate(1)
+    }
+
+    /// Calls [`abort`] on a panic, for guests built without the standard library.
+    #[cfg(feature = "panic-handler")]
+    #[panic_handler]
+    fn panic(_info: &core::panic::PanicInfo<'_>) -> ! {
+        abort()
     }
 
     #[no_mangle]
