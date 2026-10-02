@@ -226,3 +226,46 @@ jobs:
           make_latest: "false"
           files: |
             ${{ steps.artifacts.outputs.file_name }}
+
+  staticlib:
+    name: Build libziskos (riscv64im-unknown-none-elf)
+    runs-on: ubuntu-latest
+    needs: prepare
+    steps:
+      - uses: actions/checkout@v4
+
+      # riscv64im-unknown-none-elf has no prebuilt core/alloc, so the build script builds them
+      # from rust-src. llvm-tools finalizes and checks the archive.
+      - name: Install Rust nightly with rust-src and llvm-tools
+        run: rustup toolchain install nightly --component rust-src,llvm-tools --no-self-update
+
+      # A static library and linker script for guests built with a stock RV64IM toolchain, per
+      # the zkvm-standards "Static Library and Linker Script" standard.
+      - name: Build libziskos.a
+        env:
+          ZISK_TARGET: riscv64im-unknown-none-elf
+          ZISK_TOOLCHAIN: nightly
+          ZISK_FEATURES: panic-handler
+        run: .github/scripts/build-libziskos-isolated.sh
+
+      - name: Archive libziskos
+        id: artifacts
+        run: |
+          mkdir -p libziskos
+          cp target/riscv64im-unknown-none-elf/release/libziskos_staticlib.a libziskos/libziskos.a
+          cp ziskbuild/zisk_linker_script.ld libziskos/
+          ARCHIVE_FILE="libziskos_riscv64im.tar.gz"
+          tar -czvf "$ARCHIVE_FILE" -C libziskos .
+          echo "file_name=$ARCHIVE_FILE" >> $GITHUB_OUTPUT
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          name: ${{ needs.prepare.outputs.release_name }}
+          tag_name: ${{ needs.prepare.outputs.tag_name }}
+          draft: true
+          make_latest: "false"
+          files: |
+            ${{ steps.artifacts.outputs.file_name }}

@@ -72,11 +72,16 @@ _zisklib_ram_data_size       = 0x30000;   /* 192 KB reserved (ZisK library scrat
 
 SECTIONS
 {
-  .text : { *(.text.init) *(.text .text.*)} >rom AT>rom :text
+  .text : { *(.text.init) *(.text .text.*) *(.init) *(.fini) } >rom AT>rom :text
 
   . = ALIGN(8);
   PROVIDE(_global_pointer = .);
-  .rodata : { *(.rodata .rodata.*)} >rom AT>rom :rodata
+  .rodata : {
+    *(.rodata .rodata.* .srodata .srodata.*)
+    *(.data.rel.ro .data.rel.ro.*)
+    *(.eh_frame .eh_frame.* .eh_frame_hdr)
+    *(.gcc_except_table .gcc_except_table.*)
+  } >rom AT>rom :rodata
 
   /* C++ static constructors / destructors (run by _start before/after main),
      placed in ROM: the entries are link-time-constant function pointers, never

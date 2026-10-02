@@ -35,6 +35,13 @@ if [[ -n "${ZISK_FEATURES:-}" ]]; then
   FEATURE_ARGS=(--features "$ZISK_FEATURES")
 fi
 
+# Targets without a prebuilt core/alloc (e.g. riscv64im-unknown-none-elf, Tier 3)
+# build them from source, which needs the rust-src component.
+BUILD_STD_ARGS=()
+if ! rustup "+${TOOLCHAIN}" target list --installed 2>/dev/null | grep -qx "$TARGET"; then
+  BUILD_STD_ARGS=(-Z build-std=core,alloc)
+fi
+
 # Rust global-allocator shim symbols. Fat LTO + the partial link below normally
 # already internalize these (the shim is only referenced inside ziskos), but if
 # any survive as GLOBAL we localize them. This is the full set the shim can emit.
@@ -69,6 +76,7 @@ LEAK_SYMS=(
 # Public symbols that MUST stay global (sanity check at the end).
 REQUIRED_GLOBAL=(
   _start
+  abort
   read_input
   write_output
   zkvm_init
@@ -98,6 +106,7 @@ echo ">> Building ziskos-staticlib (fat LTO) for $TARGET"
 cargo "+${TOOLCHAIN}" build -p ziskos-staticlib --release \
   --target "$TARGET" \
   "${FEATURE_ARGS[@]}" \
+  ${BUILD_STD_ARGS[@]+"${BUILD_STD_ARGS[@]}"} \
   --config 'profile.release.lto="fat"'
 
 LIB=$(find target -name "libziskos_staticlib.a" -path "*$TARGET*" | head -1)
