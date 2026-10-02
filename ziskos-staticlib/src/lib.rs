@@ -1,6 +1,4 @@
 #![cfg_attr(zisk_guest, no_std)]
-#![cfg_attr(zisk_guest, feature(core_intrinsics))]
-#![cfg_attr(zisk_guest, allow(internal_features))]
 
 // This crate produces libziskos.a for linking by C (or Rust) host programs.
 //
@@ -22,7 +20,7 @@
 #[cfg(all(feature = "panic-handler", zisk_guest))]
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
-    core::intrinsics::abort()
+    ziskos::ziskos::abort()
 }
 
 /// Defines a `#[no_mangle] extern "C"` wrapper that resets ziskos's bump heap and
