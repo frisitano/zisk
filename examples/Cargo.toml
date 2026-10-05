@@ -10,6 +10,8 @@ members = [
   "fibonacci/host",
   "fibonacci/guest",
   "merkle-tree/host",
+  "abort-continues/guest",
+  "nonzero-exit/guest",
   "gcd/host",
   "gcd/guest",
   "primes/host",
